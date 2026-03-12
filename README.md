@@ -101,6 +101,3 @@ The system operates in a three-stage lifecycle:
 
 ## 🤝 Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-This project is licensed under the MIT License.
