@@ -2,8 +2,6 @@ import streamlit as st
 import requests
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime
 
 # Configuration
 API_URL = "http://127.0.0.1:8000"
@@ -12,11 +10,12 @@ st.set_page_config(
     page_title="AI Stock News Sentiment - NSE/BSE",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Custom CSS for "Pure Light" high-contrast look
-st.markdown("""
+st.markdown(
+    """
 <style>
     /* 1. Global App Surface - Pure White */
     .stApp, .main, [data-testid="stSidebar"], .stApp > header {
@@ -133,11 +132,14 @@ st.markdown("""
         border-radius: 12px;
     }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
 # Sidebar
 st.sidebar.title("📈 Stock Sentiment")
 st.sidebar.markdown("---")
+
 
 def fetch_companies(has_news=True):
     try:
@@ -145,6 +147,7 @@ def fetch_companies(has_news=True):
         return response.json()
     except:
         return []
+
 
 # Try fetching companies with news
 companies = fetch_companies(has_news=True)
@@ -157,7 +160,9 @@ if not companies:
 
 if not companies:
     # If still no companies, then it's a connection or initialization error
-    st.sidebar.error("⚠️ Connection Error: Backend not responding or database not initialized.")
+    st.sidebar.error(
+        "⚠️ Connection Error: Backend not responding or database not initialized."
+    )
     if st.sidebar.button("🔄 Retry Connection"):
         st.rerun()
     st.stop()
@@ -196,10 +201,15 @@ This system uses **FinBERT**, a state-of-the-art transformer model trained speci
 
 # Main Content
 st.title(f"Sentiment Analysis: {selected_company['name']}")
-st.subheader(f"NSE Ticker: {selected_company['ticker']} | Sector: {selected_company['sector']}")
+st.subheader(
+    f"NSE Ticker: {selected_company['ticker']} | Sector: {selected_company['sector']}"
+)
 
 if is_empty_state:
-    st.warning("📊 **Welcome!** No analyzed news found in the database. Use the sidebar to **Discover** or **Refresh** news for this company.")
+    st.warning(
+        "📊 **Welcome!** No analyzed news found in the database. Use the sidebar to **Discover** or **Refresh** news for this company."
+    )
+
 
 # Fetch Data
 def get_data(ticker):
@@ -207,15 +217,18 @@ def get_data(ticker):
     sentiment = requests.get(f"{API_URL}/sentiment/{ticker}").json()
     return news, sentiment
 
-news_data, sentiment_summary = get_data(selected_company['ticker'])
+
+news_data, sentiment_summary = get_data(selected_company["ticker"])
 
 if not news_data:
-    st.warning("No news data available for this company. Click 'Refresh News Analysis' to fetch.")
+    st.warning(
+        "No news data available for this company. Click 'Refresh News Analysis' to fetch."
+    )
 else:
     # Summary Metrics
     col1, col2, col3, col4 = st.columns(4)
-    
-    score = sentiment_summary['sentiment_score']
+
+    score = sentiment_summary["sentiment_score"]
     if score > 0.1:
         color = "normal"
         label = "Bullish"
@@ -227,9 +240,9 @@ else:
         label = "Neutral"
 
     col1.metric("Overall Sentiment", label, delta=f"{score:+.2f}", delta_color=color)
-    col2.metric("News Count", sentiment_summary['total_news_analyzed'])
-    col3.metric("Positive", sentiment_summary['distribution']['Positive'])
-    col4.metric("Negative", sentiment_summary['distribution']['Negative'])
+    col2.metric("News Count", sentiment_summary["total_news_analyzed"])
+    col3.metric("Positive", sentiment_summary["distribution"]["Positive"])
+    col4.metric("Negative", sentiment_summary["distribution"]["Negative"])
 
     st.markdown("---")
 
@@ -238,13 +251,24 @@ else:
 
     with vcol1:
         st.write("### Sentiment Distribution")
-        df_dist = pd.DataFrame([
-            {"Sentiment": k, "Count": v} for k, v in sentiment_summary['distribution'].items()
-        ])
-        fig = px.pie(df_dist, values='Count', names='Sentiment', 
-                     color='Sentiment',
-                     color_discrete_map={'Positive': '#238636', 'Negative': '#da3633', 'Neutral': '#8b949e'},
-                     hole=0.4)
+        df_dist = pd.DataFrame(
+            [
+                {"Sentiment": k, "Count": v}
+                for k, v in sentiment_summary["distribution"].items()
+            ]
+        )
+        fig = px.pie(
+            df_dist,
+            values="Count",
+            names="Sentiment",
+            color="Sentiment",
+            color_discrete_map={
+                "Positive": "#238636",
+                "Negative": "#da3633",
+                "Neutral": "#8b949e",
+            },
+            hole=0.4,
+        )
         fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), showlegend=True, height=300)
         st.plotly_chart(fig, use_container_width=True)
 
@@ -252,12 +276,16 @@ else:
         st.write("### Weekly Sentiment Trend")
         df_news = pd.DataFrame(news_data)
         # Use flexible parsing for mixed date formats
-        df_news['published_date'] = pd.to_datetime(df_news['published_date'], errors='coerce')
-        df_news['date_only'] = df_news['published_date'].dt.date
-        
-        trend = df_news.groupby('date_only')['sentiment_score'].mean().reset_index()
-        fig_trend = px.line(trend, x='date_only', y='sentiment_score', markers=True)
-        fig_trend.update_traces(line_color='#0056b3') # Professional Blue for Light Theme
+        df_news["published_date"] = pd.to_datetime(
+            df_news["published_date"], errors="coerce"
+        )
+        df_news["date_only"] = df_news["published_date"].dt.date
+
+        trend = df_news.groupby("date_only")["sentiment_score"].mean().reset_index()
+        fig_trend = px.line(trend, x="date_only", y="sentiment_score", markers=True)
+        fig_trend.update_traces(
+            line_color="#0056b3"
+        )  # Professional Blue for Light Theme
         fig_trend.update_layout(height=300, margin=dict(t=0, b=0, l=0, r=0))
         st.plotly_chart(fig_trend, use_container_width=True)
 
@@ -265,9 +293,10 @@ else:
 
     # News Feed
     st.write("### Recent News Feed")
-    for news in news_data[:15]: # Show top 15
-        sentiment_class = news['sentiment']
-        st.markdown(f"""
+    for news in news_data[:15]:  # Show top 15
+        sentiment_class = news["sentiment"]
+        st.markdown(
+            f"""
             <div class="news-card sentiment-{sentiment_class}">
                 <div class="news-meta">
                     {news['source']} | {news['published_date'][:10]} | 
@@ -280,4 +309,6 @@ else:
                     {news['summary'] if news['summary'] else 'No summary available.'}
                 </p>
             </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )
