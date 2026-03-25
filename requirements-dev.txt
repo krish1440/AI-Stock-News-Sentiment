@@ -1,0 +1,6 @@
+ruff
+mypy
+black
+pytest
+types-requests
+types-python-dateutil
