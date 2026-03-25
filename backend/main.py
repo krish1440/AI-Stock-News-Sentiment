@@ -57,8 +57,7 @@ def discover_and_process_news(db: Session):
         detected_companies = nlp.extract_companies(text)
         
         for company_name in detected_companies:
-            # 3. Check if company exists
-            # We use a simple like search or exact match
+            # 3. Check if company exists by name
             company = db.query(Company).filter(Company.name.ilike(f"%{company_name}%")).first()
             
             if not company:
@@ -66,11 +65,21 @@ def discover_and_process_news(db: Session):
                 ticker = scraper.search_ticker(company_name)
                 # STRICT REQUIREMENT: Only accept Indian Stock Market tickers
                 if ticker and (ticker.endswith('.NS') or ticker.endswith('.BO')):
-                    print(f"Discovered new Indian company: {company_name} ({ticker})")
-                    company = Company(name=company_name, ticker=ticker, sector="Discovered")
-                    db.add(company)
-                    db.commit()
-                    db.refresh(company)
+                    # Check if ticker already exists even if name search failed
+                    existing_company = db.query(Company).filter(Company.ticker == ticker).first()
+                    if existing_company:
+                        company = existing_company
+                    else:
+                        print(f"Discovered new Indian company: {company_name} ({ticker})")
+                        company = Company(name=company_name, ticker=ticker, sector="Discovered")
+                        db.add(company)
+                        try:
+                            db.commit()
+                            db.refresh(company)
+                        except Exception as e:
+                            db.rollback()
+                            print(f"Database error saving company {company_name}: {e}")
+                            continue
                 else:
                     # Skip noise (Global stocks, people, sports teams)
                     continue
