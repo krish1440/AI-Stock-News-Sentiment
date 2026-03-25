@@ -2,6 +2,7 @@ import os
 import requests
 import feedparser
 from datetime import datetime, timedelta
+from typing import List, Dict, Any, Optional, Union
 from newsapi import NewsApiClient
 import yfinance as yf
 from dotenv import load_dotenv
@@ -9,13 +10,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class NewsScraper:
+    """
+    A comprehensive news scraping engine for financial discovery.
+    Coordinates multiple sources including NewsAPI, GNews, yfinance, and RSS feeds.
+    """
+    
     def __init__(self):
-        self.newsapi_key = os.getenv("NEWS_API_KEY")
-        self.gnews_key = os.getenv("GNEWS_API_KEY")
-        self.newsapi = NewsApiClient(api_key=self.newsapi_key) if self.newsapi_key else None
+        """Initialize api keys and various news sources."""
+        self.newsapi_key: Optional[str] = os.getenv("NEWS_API_KEY")
+        self.gnews_key: Optional[str] = os.getenv("GNEWS_API_KEY")
+        self.newsapi: Optional[NewsApiClient] = NewsApiClient(api_key=self.newsapi_key) if self.newsapi_key else None
         
         # Free RSS Feeds for Discovery
-        self.rss_feeds = [
+        self.rss_feeds: List[str] = [
             "https://www.moneycontrol.com/rss/business.xml",
             "https://www.moneycontrol.com/rss/latestnews.xml",
             "https://economictimes.indiatimes.com/news/economy/rssfeedsms.cms",
@@ -25,8 +32,16 @@ class NewsScraper:
             "https://feeds.feedburner.com/reuters/INbusinessNews",
         ]
 
-    def fetch_via_newsapi(self, query):
-        """Fetch news using NewsAPI.org"""
+    def fetch_via_newsapi(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Fetch news using NewsAPI.org for a specific query.
+        
+        Args:
+            query: The search term or company name.
+            
+        Returns:
+            A list of article dictionaries with standardized keys.
+        """
         if not self.newsapi:
             return []
         
@@ -55,8 +70,16 @@ class NewsScraper:
             print(f"Error fetching from NewsAPI: {e}")
             return []
 
-    def fetch_via_gnews(self, query):
-        """Fetch news using GNews.io"""
+    def fetch_via_gnews(self, query: str) -> List[Dict[str, Any]]:
+        """
+        Fetch news using GNews.io for a specific query.
+        
+        Args:
+            query: The search term or company name.
+            
+        Returns:
+            A list of article dictionaries with standardized keys.
+        """
         if not self.gnews_key:
             return []
             
@@ -80,8 +103,16 @@ class NewsScraper:
             print(f"Error fetching from GNews: {e}")
             return []
 
-    def fetch_via_yfinance(self, ticker):
-        """Fetch news using yfinance (Ticker specific)"""
+    def fetch_via_yfinance(self, ticker: str) -> List[Dict[str, Any]]:
+        """
+        Fetch news using yfinance specifically for a given stock ticker.
+        
+        Args:
+            ticker: The stock ticker (e.g., 'RELIANCE.NS').
+            
+        Returns:
+            A list of article dictionaries with standardized keys.
+        """
         try:
             stock = yf.Ticker(ticker)
             news = stock.news
@@ -104,8 +135,14 @@ class NewsScraper:
             print(f"Error fetching from yfinance for {ticker}: {e}")
             return []
 
-    def fetch_discovery_news(self):
-        """Fetch general financial news from RSS feeds for discovery"""
+    def fetch_discovery_news(self) -> List[Dict[str, Any]]:
+        """
+        Automatically discovers general financial news from a pre-defined set of RSS feeds.
+        Used for identifying trending market topics.
+        
+        Returns:
+            A list of article dictionaries with standardized keys.
+        """
         discovery_articles = []
         for feed_url in self.rss_feeds:
             try:
@@ -135,26 +172,34 @@ class NewsScraper:
                         'published_date': art['publishedAt'],
                         'content': art.get('content', '')
                     })
-            except:
+            except Exception:
                 pass
                 
         return discovery_articles
 
-    def search_ticker(self, company_name):
-        """Attempt to find a relevant Indian ticker for a company name"""
+    def search_ticker(self, company_name: str) -> Optional[str]:
+        """
+        Tries to match a company name to its relevant NSE/BSE stock ticker.
+        
+        Args:
+            company_name: The detected name of the entity.
+            
+        Returns:
+            The ticker symbol with .NS or .BO suffix if found, else None.
+        """
         try:
-            results = yf.Search(company_name, max_results=5).quotes
-            if not results:
+            search_results = yf.Search(company_name, max_results=5).quotes
+            if not search_results:
                 return None
             
             # Prefer Indian tickers (.NS or .BO)
-            for q in results:
-                symbol = q.get('symbol', '')
+            for quote in search_results:
+                symbol = quote.get('symbol', '')
                 if symbol.endswith('.NS') or symbol.endswith('.BO'):
                     return symbol
             
             # Fallback to the first result only if it's a very close name match
-            first_quote = results[0]
+            first_quote = search_results[0]
             if company_name.lower() in first_quote.get('shortname', '').lower():
                 return first_quote['symbol']
                 
@@ -162,8 +207,18 @@ class NewsScraper:
             print(f"Ticker Search Error for {company_name}: {e}")
         return None
 
-    def scrape_all(self, company_name, ticker):
-        """Aggregate news from all sources"""
+    def scrape_all(self, company_name: str, ticker: str) -> List[Dict[str, Any]]:
+        """
+        Aggregates news from all configured sources for a specific company.
+        Includes deduplication logic based on article URLs.
+        
+        Args:
+            company_name: The company name to search for.
+            ticker: The primary ticker for deep searching.
+            
+        Returns:
+            A deduplicated list of articles across all sources.
+        """
         all_articles = []
         
         # 1. NewsAPI
@@ -176,6 +231,6 @@ class NewsScraper:
         all_articles.extend(self.fetch_via_yfinance(ticker))
         
         # Deduplicate by URL
-        unique_articles = {art['url']: art for art in all_articles}.values()
+        unique_articles = {art['url']: art for art in all_articles if art.get('url')}.values()
         
         return list(unique_articles)
